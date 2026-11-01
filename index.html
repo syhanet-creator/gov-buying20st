@@ -124,7 +124,7 @@ a.card:active{opacity:.7}
   <button id="more" type="button" hidden>더 보기</button>
 </main>
 <script>
-const REFRESH_MS = 60_000, PAGE = 20, KEY = 'bidFilters.v2';
+const REFRESH_MS = 180_000, PAGE = 20, KEY = 'bidFilters.v2';
 const TYPES = { cnstwk: '공사', servc: '용역', thng: '물품' };
 const REGIONS = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
 const $ = (s) => document.querySelector(s);
@@ -269,7 +269,13 @@ async function load() {
     if (st.min !== '') p.set('min', Math.round(Number(st.min) * 1e4));
     if (st.max !== '') p.set('max', Math.round(Number(st.max) * 1e4));
     const res = await fetch('/api/bids?' + p, { cache: 'no-store' });
-    const j = await res.json();
+    const raw = await res.text();
+    let j;
+    try { j = JSON.parse(raw); } catch {
+      throw new Error(res.status === 504 || /TIMEOUT/i.test(raw)
+        ? '서버 응답 시간이 초과되었습니다. 기간을 줄이거나 조건을 추가해 다시 검색해 주세요.'
+        : `서버 오류 (${res.status})`);
+    }
     if (!res.ok || j.error) throw new Error(j.error || res.status);
     data = j;
     $('#dot').className = 'dot';

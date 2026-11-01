@@ -21,10 +21,12 @@ const REGIONS = {
   경북: ['경북', '경상북도'], 경남: ['경남', '경상남도'], 제주: ['제주'],
 };
 
-const ROWS = 999;      // API 1회 최대 건수
-const MAX_PAGES = 4;   // 유형별 최대 페이지 (최대 약 4,000건)
+const ROWS = 500;      // API 1회 요청 건수
+const MAX_PAGES = 5;   // 유형별 최대 페이지 (최대 약 2,500건)
 const MAX_DAYS = 31;   // 조회 기간 상한
 const DAY = 86400000;
+// 함수 제한(30초) 안에 반드시 응답하기 위한 마감 시간. 넘으면 받은 만큼만 돌려줍니다.
+const DEADLINE_MS = Number(process.env.BID_DEADLINE_MS) || 24000;
 
 export const config = { maxDuration: 30 };
 
@@ -66,39 +68,59 @@ function normalize(type, i) {
   };
 }
 
-async function fetchType(type, serviceKey, r, basis, title) {
+// API 1회 호출. 마감(deadline)까지 남은 시간만큼만 기다립니다.
+async function callApi(type, serviceKey, r, basis, title, page, deadline) {
   const label = OPS[type].label;
-  const rows = [];
-  let truncated = false;
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = new URL(`${BASE}/${OPS[type].op}`);
-    const sp = url.searchParams;
-    sp.set('serviceKey', serviceKey);
-    sp.set('pageNo', String(page));
-    sp.set('numOfRows', String(ROWS));
-    sp.set('type', 'json');
-    sp.set('inqryDiv', basis); // 1 공고게시일시, 2 개찰일시
-    sp.set('inqryBgnDt', stamp(new Date(r.fromMs), '0000'));
-    sp.set('inqryEndDt', stamp(new Date(r.toMs), '2359'));
-    if (title) sp.set('bidNtceNm', title);
+  const url = new URL(`${BASE}/${OPS[type].op}`);
+  const sp = url.searchParams;
+  sp.set('serviceKey', serviceKey);
+  sp.set('pageNo', String(page));
+  sp.set('numOfRows', String(ROWS));
+  sp.set('type', 'json');
+  sp.set('inqryDiv', basis); // 1 공고게시일시, 2 개찰일시
+  sp.set('inqryBgnDt', stamp(new Date(r.fromMs), '0000'));
+  sp.set('inqryEndDt', stamp(new Date(r.toMs), '2359'));
+  if (title) sp.set('bidNtceNm', title);
 
-    const resp = await fetch(url);
-    const text = await resp.text();
-    let json;
-    try { json = JSON.parse(text); } catch { throw new Error(`${label} API 응답 오류: ${text.slice(0, 160)}`); }
-    if (!json?.response) throw new Error(`${label} API 오류: ${text.slice(0, 160)}`);
-    const h = json.response.header;
-    if (h?.resultCode && h.resultCode !== '00') {
-      if (h.resultCode === '03') break; // 데이터 없음
-      throw new Error(`${label} API 오류 ${h.resultCode}: ${h.resultMsg}`);
+  const left = deadline - Date.now();
+  if (left < 1000) throw new Error(`${label} 조회 시간 초과`);
+  let text;
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(left) });
+    text = await resp.text();
+  } catch (e) {
+    if (e?.name === 'TimeoutError' || e?.name === 'AbortError') throw new Error(`${label} 조회 시간 초과 (공공데이터포털 응답 지연)`);
+    throw e;
+  }
+
+  let json;
+  try { json = JSON.parse(text); } catch { throw new Error(`${label} API 응답 오류: ${text.slice(0, 160)}`); }
+  if (!json?.response) throw new Error(`${label} API 오류: ${text.slice(0, 160)}`);
+  const h = json.response.header;
+  if (h?.resultCode && h.resultCode !== '00') {
+    if (h.resultCode === '03') return { rows: [], total: 0 }; // 데이터 없음
+    throw new Error(`${label} API 오류 ${h.resultCode}: ${h.resultMsg}`);
+  }
+  const body = json.response.body ?? {};
+  let items = body.items ?? [];
+  if (!Array.isArray(items)) items = items.item ? [].concat(items.item) : [];
+  return { rows: items.map((i) => normalize(type, i)), total: Number(body.totalCount) || 0 };
+}
+
+// 1페이지로 전체 건수를 확인한 뒤 나머지 페이지는 동시에 요청합니다.
+async function fetchType(type, serviceKey, r, basis, title, deadline) {
+  const first = await callApi(type, serviceKey, r, basis, title, 1, deadline);
+  const rows = [...first.rows];
+  const pages = Math.min(Math.ceil(first.total / ROWS), MAX_PAGES);
+  let truncated = first.total > MAX_PAGES * ROWS;
+  if (pages > 1) {
+    const rest = await Promise.allSettled(
+      Array.from({ length: pages - 1 }, (_, k) => callApi(type, serviceKey, r, basis, title, k + 2, deadline)),
+    );
+    for (const x of rest) {
+      if (x.status === 'fulfilled') rows.push(...x.value.rows);
+      else truncated = true; // 일부 페이지만 받음
     }
-    const body = json.response.body ?? {};
-    let items = body.items ?? [];
-    if (!Array.isArray(items)) items = items.item ? [].concat(items.item) : [];
-    rows.push(...items.map((i) => normalize(type, i)));
-    const total = Number(body.totalCount) || 0;
-    if (!items.length || page * ROWS >= total) break;
-    if (page === MAX_PAGES) truncated = true;
   }
   return { rows, truncated };
 }
@@ -134,7 +156,9 @@ function sortList(list, sort) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
+  const deadline = Date.now() + DEADLINE_MS;
+  // 인증키 호출 한도를 아끼기 위해 같은 조건은 3분간 캐시
+  res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=300');
   const qy = req.query || {};
   const g = (k) => { const v = Array.isArray(qy[k]) ? qy[k][0] : qy[k]; return v == null ? '' : String(v).trim(); };
 
@@ -147,7 +171,8 @@ export default async function handler(req, res) {
   const limit = Math.min(Math.max(parseInt(g('limit'), 10) || 20, 1), 200);
 
   try {
-    const rawKey = process.env.DATA_GO_KR_KEY;
+    // 키 앞뒤 공백·따옴표 제거
+    const rawKey = (process.env.DATA_GO_KR_KEY || '').trim().replace(/^["']+|["']+$/g, '');
     const demo = !rawKey;
     let all = [];
     let truncated = false;
@@ -165,7 +190,7 @@ export default async function handler(req, res) {
       let key = rawKey;
       if (key.includes('%')) { try { key = decodeURIComponent(key); } catch { /* 그대로 사용 */ } }
       const apiTitle = f.q ? f.q.split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length)[0] : '';
-      const results = await Promise.allSettled(types.map((t) => fetchType(t, key, r, basis, apiTitle)));
+      const results = await Promise.allSettled(types.map((t) => fetchType(t, key, r, basis, apiTitle, deadline)));
       for (const x of results) {
         if (x.status === 'fulfilled') { all.push(...x.value.rows); truncated = truncated || x.value.truncated; }
         else warnings.push(String(x.reason?.message || x.reason));
@@ -192,6 +217,8 @@ export default async function handler(req, res) {
       items: filtered.slice(0, limit),
     });
   } catch (e) {
+    // 실패 응답은 캐시하지 않음
+    res.setHeader('Cache-Control', 'no-store');
     res.status(502).json({ error: String(e.message || e) });
   }
 }
