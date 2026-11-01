@@ -4,80 +4,242 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b3d6e">
-<title>조달청 공사 입찰 신규 20</title>
+<title>나라장터 입찰공고 검색</title>
 <style>
-:root{--bg:#f4f6f9;--card:#fff;--tx:#1b2430;--sub:#6b7686;--pri:#0b3d6e;--acc:#e8590c;--line:#e3e8ef}
-@media(prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#18202a;--tx:#e8edf3;--sub:#93a0b2;--pri:#5aa2e6;--acc:#ff8a4c;--line:#263140}}
+:root{--bg:#f4f6f9;--card:#fff;--tx:#1b2430;--sub:#6b7686;--pri:#0b3d6e;--acc:#e8590c;--line:#e3e8ef;--in:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#18202a;--tx:#e8edf3;--sub:#93a0b2;--pri:#5aa2e6;--acc:#ff8a4c;--line:#263140;--in:#0f141b}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif}
-header{position:sticky;top:0;z-index:5;background:var(--pri);color:#fff;padding:12px 16px calc(10px) ;padding-top:calc(12px + env(safe-area-inset-top))}
+header{position:sticky;top:0;z-index:5;background:var(--pri);color:#fff;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top))}
 header h1{margin:0;font-size:18px}
-.meta{font-size:12px;opacity:.85;margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.meta{font-size:12px;opacity:.9;margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .dot{width:8px;height:8px;border-radius:50%;background:#4ade80;display:inline-block}
 .dot.err{background:#f87171}
-.tools{display:flex;gap:8px;margin-top:8px}
-.tools input{flex:1;padding:8px 10px;border-radius:8px;border:0;font-size:14px}
-.tools button{padding:8px 12px;border-radius:8px;border:0;background:#ffffff26;color:#fff;font-size:14px}
-main{padding:12px;max-width:820px;margin:0 auto}
+main{padding:12px;max-width:860px;margin:0 auto}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+.panel>summary{cursor:pointer;padding:12px 14px;font-weight:700;list-style:none;display:flex;flex-direction:column;gap:2px}
+.panel>summary::-webkit-details-marker{display:none}
+.sum{font-weight:400;font-size:12.5px;color:var(--sub)}
+form{padding:0 14px 14px;display:grid;gap:12px}
+.lb{display:block;font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip span,.chips button{display:inline-block;padding:6px 13px;border-radius:99px;border:1px solid var(--line);background:var(--in);color:var(--tx);font-size:14px;cursor:pointer}
+.chip input:checked+span,.chips button.on{background:var(--pri);border-color:var(--pri);color:#fff}
+input[type=text],input[type=search],input[type=number],input[type=date],select{width:100%;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--in);color:var(--tx);font-size:14.5px}
+.two{display:flex;gap:6px;align-items:center;margin-top:6px}
+.two span{color:var(--sub)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:520px){.row2{grid-template-columns:1fr}}
+.btns{display:flex;gap:8px}
+.btns button{flex:1;padding:11px;border-radius:10px;border:1px solid var(--line);background:var(--in);color:var(--tx);font-size:15px;font-weight:700;cursor:pointer}
+.btns .pri{background:var(--pri);border-color:var(--pri);color:#fff}
 .banner{background:#fff4e6;color:#a04400;border:1px solid #ffd8a8;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px}
 .err-box{background:#ffe3e3;color:#a61e1e;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px}
+.sumline{font-size:13px;color:var(--sub);margin:4px 2px 8px}
 .card{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px;text-decoration:none;color:inherit}
-.card:active{opacity:.7}
+a.card:active{opacity:.7}
 .top{display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap}
 .badge{font-size:11px;padding:2px 7px;border-radius:99px;background:var(--line);color:var(--sub)}
 .badge.new{background:var(--acc);color:#fff;font-weight:700}
-.badge.d{background:#e7f1fb;color:var(--pri)}
+.badge.d{background:#e7f1fb;color:#0b3d6e}
 .badge.urgent{background:#ffe3e3;color:#c92a2a;font-weight:700}
+.badge.t-cnstwk{background:#dbeafe;color:#1d4ed8;font-weight:700}
+.badge.t-servc{background:#dcfce7;color:#15803d;font-weight:700}
+.badge.t-thng{background:#f3e8ff;color:#7e22ce;font-weight:700}
 .title{font-weight:700;font-size:15.5px;margin:2px 0 6px;word-break:keep-all}
 .row{font-size:13px;color:var(--sub);display:flex;gap:4px 14px;flex-wrap:wrap}
 .price{color:var(--tx);font-weight:700}
 .empty{text-align:center;color:var(--sub);padding:40px 0}
+#more{display:block;width:100%;padding:12px;margin:4px 0 24px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--tx);font-size:15px;font-weight:700;cursor:pointer}
 </style>
 </head>
 <body>
 <header>
-  <h1>🏗️ 조달청 공사 입찰 신규 20</h1>
-  <div class="meta"><span class="dot" id="dot"></span><span id="status">불러오는 중…</span><span id="count"></span></div>
-  <div class="tools">
-    <input id="q" type="search" placeholder="공고명·기관·지역 검색">
-    <button id="reload">새로고침</button>
-  </div>
+  <h1>🏗️ 나라장터 입찰공고 검색</h1>
+  <div class="meta"><span class="dot" id="dot"></span><span id="status">불러오는 중…</span></div>
 </header>
 <main>
-  <div id="banner"></div>
+  <details class="panel" id="panel" open>
+    <summary><span>🔎 검색 조건</span><span class="sum" id="sum"></span></summary>
+    <form id="f">
+      <div>
+        <span class="lb">입찰 유형</span>
+        <div class="chips" id="types">
+          <label class="chip"><input type="checkbox" value="cnstwk"><span>공사</span></label>
+          <label class="chip"><input type="checkbox" value="servc"><span>용역</span></label>
+          <label class="chip"><input type="checkbox" value="thng"><span>물품</span></label>
+        </div>
+      </div>
+      <div>
+        <span class="lb">기간</span>
+        <div class="chips" id="presets">
+          <button type="button" data-d="1">오늘</button>
+          <button type="button" data-d="3">3일</button>
+          <button type="button" data-d="7">7일</button>
+          <button type="button" data-d="14">14일</button>
+          <button type="button" data-d="31">31일</button>
+        </div>
+        <div class="two"><input type="date" id="from"><span>~</span><input type="date" id="to"></div>
+        <div class="two"><select id="basis"><option value="1">공고게시일 기준</option><option value="2">개찰일시 기준</option></select></div>
+      </div>
+      <div class="row2">
+        <div><label class="lb" for="region">지역</label><select id="region"></select></div>
+        <div><label class="lb" for="org">기관·지역 키워드</label><input id="org" type="text" placeholder="예: 울주군, 한국수력원자력"></div>
+      </div>
+      <div>
+        <label class="lb" for="q">품목·키워드 (공고명에 포함)</label>
+        <input id="q" type="search" placeholder="예: 도로, 노트북, 안전진단 (여러 단어는 모두 포함)">
+      </div>
+      <div>
+        <label class="lb" for="amt">추정금액</label>
+        <select id="amt">
+          <option value="">전체 / 직접 입력</option>
+          <option value="0,10000">1억 미만</option>
+          <option value="10000,50000">1억 ~ 5억</option>
+          <option value="50000,100000">5억 ~ 10억</option>
+          <option value="100000,500000">10억 ~ 50억</option>
+          <option value="500000,">50억 이상</option>
+        </select>
+        <div class="two"><input id="min" type="number" inputmode="numeric" min="0" placeholder="최소 (만원)"><span>~</span><input id="max" type="number" inputmode="numeric" min="0" placeholder="최대 (만원)"></div>
+      </div>
+      <div>
+        <label class="lb" for="sort">정렬</label>
+        <select id="sort">
+          <option value="new">최신 공고순</option>
+          <option value="close">마감 임박순</option>
+          <option value="price">금액 높은순</option>
+        </select>
+      </div>
+      <div class="btns">
+        <button type="submit" class="pri">검색</button>
+        <button type="button" id="reset">초기화</button>
+      </div>
+    </form>
+  </details>
+  <div id="note"></div>
+  <div class="sumline" id="sumline"></div>
   <div id="list"></div>
+  <button id="more" type="button" hidden>더 보기</button>
 </main>
 <script>
-const REFRESH_MS = 60_000;
-let items = [], seen = new Set(JSON.parse(localStorage.getItem('seenBids') || '[]')), firstLoad = !localStorage.getItem('seenBids');
+const REFRESH_MS = 60_000, PAGE = 20, KEY = 'bidFilters.v2';
+const TYPES = { cnstwk: '공사', servc: '용역', thng: '물품' };
+const REGIONS = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
 const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const kstDate = (back = 0) => new Date(Date.now() + 9 * 3600000 - back * 86400000).toISOString().slice(0, 10);
+const def = () => ({ types: Object.keys(TYPES), preset: 3, from: '', to: '', basis: '1', region: '', org: '', q: '', min: '', max: '', sort: 'new' });
 
+let st;
+try { st = { ...def(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { st = def(); }
+let limit = PAGE, loading = false, data = null, formPreset = st.preset;
+
+const rangeOf = (s) => s.preset > 0
+  ? { from: kstDate(s.preset - 1), to: kstDate() }
+  : { from: s.from || kstDate(2), to: s.to || kstDate() };
+
+// ── 폼 ─────────────────────────────────────────
+$('#region').innerHTML = '<option value="">전체 지역</option>' + REGIONS.map((r) => `<option>${r}</option>`).join('');
+
+function markPreset() {
+  document.querySelectorAll('#presets button').forEach((b) => b.classList.toggle('on', Number(b.dataset.d) === formPreset));
+}
+function writeForm(s) {
+  document.querySelectorAll('#types input').forEach((c) => { c.checked = s.types.includes(c.value); });
+  formPreset = s.preset;
+  const r = rangeOf(s);
+  $('#from').value = r.from; $('#to').value = r.to;
+  $('#basis').value = s.basis; $('#region').value = s.region; $('#org').value = s.org; $('#q').value = s.q;
+  $('#min').value = s.min; $('#max').value = s.max; $('#amt').value = ''; $('#sort').value = s.sort;
+  markPreset();
+}
+function readForm() {
+  let types = [...document.querySelectorAll('#types input:checked')].map((c) => c.value);
+  if (!types.length) types = Object.keys(TYPES);
+  return {
+    types, preset: formPreset, from: $('#from').value, to: $('#to').value, basis: $('#basis').value,
+    region: $('#region').value, org: $('#org').value.trim(), q: $('#q').value.trim(),
+    min: $('#min').value.trim(), max: $('#max').value.trim(), sort: $('#sort').value,
+  };
+}
+function describe(s) {
+  const r = rangeOf(s);
+  const money = (m) => (m >= 10000 ? `${m / 10000}억` : `${m}만원`);
+  const p = [s.types.length === 3 ? '공사·용역·물품' : s.types.map((t) => TYPES[t]).join('·')];
+  p.push(s.preset > 0 ? (s.preset === 1 ? '오늘' : `최근 ${s.preset}일`) : `${r.from.slice(5)}~${r.to.slice(5)}`);
+  if (s.basis === '2') p.push('개찰일 기준');
+  if (s.region) p.push(s.region);
+  if (s.org) p.push(s.org);
+  if (s.q) p.push(`“${s.q}”`);
+  if (s.min !== '' || s.max !== '') p.push(`${s.min !== '' ? money(Number(s.min)) : ''}~${s.max !== '' ? money(Number(s.max)) : ''}`);
+  return p.join(' · ');
+}
+
+document.querySelectorAll('#presets button').forEach((b) => b.addEventListener('click', () => {
+  formPreset = Number(b.dataset.d);
+  const r = rangeOf({ preset: formPreset });
+  $('#from').value = r.from; $('#to').value = r.to; markPreset();
+}));
+['#from', '#to'].forEach((id) => $(id).addEventListener('input', () => { formPreset = 0; markPreset(); }));
+$('#amt').addEventListener('change', (e) => {
+  if (!e.target.value) return;
+  const [a, b] = e.target.value.split(',');
+  $('#min').value = a; $('#max').value = b;
+});
+['#min', '#max'].forEach((id) => $(id).addEventListener('input', () => { $('#amt').value = ''; }));
+
+$('#f').addEventListener('submit', (e) => {
+  e.preventDefault();
+  st = readForm();
+  try { localStorage.setItem(KEY, JSON.stringify(st)); } catch {}
+  limit = PAGE;
+  load();
+  if (innerWidth < 700) $('#panel').open = false;
+});
+$('#reset').addEventListener('click', () => {
+  st = def(); writeForm(st);
+  try { localStorage.setItem(KEY, JSON.stringify(st)); } catch {}
+  limit = PAGE; load();
+});
+$('#more').addEventListener('click', () => { limit += PAGE; load(); });
+
+// ── 표시 ─────────────────────────────────────────
 const won = (n) => {
-  if (!n) return '미공개';
-  if (n >= 1e8) return (n / 1e8).toFixed(n % 1e8 ? 2 : 0).replace(/\.?0+$/, '') + '억원';
+  if (!n) return '금액 미공개';
+  if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, '') + '억원';
   if (n >= 1e4) return Math.round(n / 1e4).toLocaleString() + '만원';
   return n.toLocaleString() + '원';
 };
-const parse = (s) => s ? new Date(String(s).replace(' ', 'T') + '+09:00') : null;
-const short = (s) => s ? String(s).slice(5, 16).replace('-', '/') : '-';
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
+const parse = (s) => (s ? new Date(String(s).replace(' ', 'T') + '+09:00') : null);
+const short = (s) => (s ? String(s).slice(5, 16).replace('-', '/') : '-');
 function dday(closeAt) {
-  const d = parse(closeAt); if (!d) return '';
+  const d = parse(closeAt); if (!d || isNaN(d)) return '';
   const diff = Math.ceil((d - new Date()) / 86400000);
   if (diff < 0) return '<span class="badge">마감</span>';
   if (diff <= 1) return `<span class="badge urgent">${diff === 0 ? 'D-DAY' : 'D-1'}</span>`;
   return `<span class="badge d">D-${diff}</span>`;
 }
+const isNew = (postedAt) => { const d = parse(postedAt); return d && Date.now() - d < 3 * 3600000 && Date.now() >= d; };
 
 function render() {
-  const kw = $('#q').value.trim().toLowerCase();
-  const rows = items.filter((i) => !kw || [i.title, i.org, i.demand, i.region].join(' ').toLowerCase().includes(kw));
-  $('#count').textContent = `· ${rows.length}건`;
-  $('#list').innerHTML = rows.length ? rows.map((i) => `
-    <a class="card" href="${esc(i.url) || '#'}" target="_blank" rel="noopener">
+  const j = data; if (!j) return;
+  const notes = [];
+  if (j.demo) notes.push('<div class="banner">⚠️ 샘플 데이터입니다. Vercel 환경변수 <b>DATA_GO_KR_KEY</b>에 공공데이터포털 인증키를 등록하면 실제 공고가 표시됩니다.</div>');
+  if (j.clamped) notes.push(`<div class="banner">조회 기간은 최대 31일입니다. ${j.range.from} ~ ${j.range.to} 로 조정했습니다.</div>`);
+  if (j.truncated) notes.push('<div class="banner">공고가 많아 일부만 조회됐을 수 있습니다. 기간을 줄이거나 키워드를 넣어 주세요.</div>');
+  (j.warnings || []).forEach((w) => notes.push(`<div class="err-box">${esc(w)}</div>`));
+  $('#note').innerHTML = notes.join('');
+
+  const c = j.counts || {};
+  $('#sumline').textContent = `조건에 맞는 공고 ${j.total.toLocaleString()}건 중 ${j.items.length}건 표시` +
+    (j.total ? ` (${Object.keys(TYPES).filter((t) => c[t]).map((t) => `${TYPES[t]} ${c[t]}`).join(' · ')})` : '');
+  $('#list').innerHTML = j.items.length ? j.items.map((i) => {
+    const inner = `
       <div class="top">
-        ${i.isNew ? '<span class="badge new">NEW</span>' : ''}${dday(i.closeAt)}
+        <span class="badge t-${esc(i.type)}">${esc(i.typeLabel)}</span>
+        ${isNew(i.postedAt) ? '<span class="badge new">NEW</span>' : ''}${dday(i.closeAt)}
         ${i.region ? `<span class="badge">${esc(i.region)}</span>` : ''}
         <span class="badge">${esc(i.no)}</span>
       </div>
@@ -87,35 +249,44 @@ function render() {
         <span class="price">💰 ${won(i.price)}</span>
         <span>게시 ${short(i.postedAt)}</span>
         <span>마감 ${short(i.closeAt)}</span>
-      </div>
-    </a>`).join('') : '<div class="empty">조건에 맞는 공고가 없습니다</div>';
+      </div>`;
+    return i.url ? `<a class="card" href="${esc(i.url)}" target="_blank" rel="noopener">${inner}</a>` : `<div class="card">${inner}</div>`;
+  }).join('') : '<div class="empty">조건에 맞는 공고가 없습니다</div>';
+  $('#more').hidden = j.items.length >= j.total;
 }
 
 async function load() {
+  if (loading) return;
+  loading = true;
+  $('#sum').textContent = describe(st);
   $('#status').textContent = '갱신 중…';
   try {
-    const r = await fetch('/api/bids', { cache: 'no-store' });
-    const j = await r.json();
-    if (!r.ok || j.error) throw new Error(j.error || r.status);
-    items = j.items.map((i) => ({ ...i, isNew: !firstLoad && !seen.has(i.no) }));
-    j.items.forEach((i) => seen.add(i.no));
-    localStorage.setItem('seenBids', JSON.stringify([...seen].slice(-500)));
-    firstLoad = false;
+    const r = rangeOf(st);
+    const p = new URLSearchParams({ types: st.types.join(','), from: r.from, to: r.to, basis: st.basis, sort: st.sort, limit });
+    if (st.region) p.set('region', st.region);
+    if (st.org) p.set('org', st.org);
+    if (st.q) p.set('q', st.q);
+    if (st.min !== '') p.set('min', Math.round(Number(st.min) * 1e4));
+    if (st.max !== '') p.set('max', Math.round(Number(st.max) * 1e4));
+    const res = await fetch('/api/bids?' + p, { cache: 'no-store' });
+    const j = await res.json();
+    if (!res.ok || j.error) throw new Error(j.error || res.status);
+    data = j;
     $('#dot').className = 'dot';
     $('#status').textContent = '최종 갱신 ' + new Date(j.updatedAt).toLocaleTimeString('ko-KR');
-    $('#banner').innerHTML = j.demo ? '<div class="banner">⚠️ 샘플 데이터입니다. Vercel 환경변수 <b>DATA_GO_KR_KEY</b>에 공공데이터포털 인증키를 등록하면 실제 공고가 표시됩니다.</div>' : '';
     render();
   } catch (e) {
     $('#dot').className = 'dot err';
     $('#status').textContent = '갱신 실패';
-    $('#banner').innerHTML = `<div class="err-box">불러오지 못했습니다: ${esc(e.message)}</div>`;
+    $('#note').innerHTML = `<div class="err-box">불러오지 못했습니다: ${esc(e.message)}</div>`;
+  } finally {
+    loading = false;
   }
 }
 
-$('#q').addEventListener('input', render);
-$('#reload').addEventListener('click', load);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
+writeForm(st);
 load();
 </script>
 </body>

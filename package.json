@@ -1,0 +1,6 @@
+{
+  "name": "gov-buying20st",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" }
+}
