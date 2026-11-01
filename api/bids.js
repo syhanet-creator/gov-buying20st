@@ -112,17 +112,22 @@ async function fetchType(type, serviceKey, r, basis, title, deadline) {
   const first = await callApi(type, serviceKey, r, basis, title, 1, deadline);
   const rows = [...first.rows];
   const pages = Math.min(Math.ceil(first.total / ROWS), MAX_PAGES);
-  let truncated = first.total > MAX_PAGES * ROWS;
   if (pages > 1) {
     const rest = await Promise.allSettled(
       Array.from({ length: pages - 1 }, (_, k) => callApi(type, serviceKey, r, basis, title, k + 2, deadline)),
     );
-    for (const x of rest) {
-      if (x.status === 'fulfilled') rows.push(...x.value.rows);
-      else truncated = true; // 일부 페이지만 받음
+    for (const x of rest) if (x.status === 'fulfilled') rows.push(...x.value.rows);
+  }
+  // 전체 건수보다 적게 받았으면 일부만 조회된 것 (페이지 상한 또는 시간 초과)
+  const partial = rows.length < first.total;
+  let from = '', to = '';
+  if (partial) {
+    for (const i of rows) {
+      if (i.postedAt && (!from || i.postedAt < from)) from = i.postedAt;
+      if (i.postedAt > to) to = i.postedAt;
     }
   }
-  return { rows, truncated };
+  return { rows, partial, total: first.total, from, to };
 }
 
 function matches(i, f) {
@@ -175,7 +180,7 @@ export default async function handler(req, res) {
     const rawKey = (process.env.DATA_GO_KR_KEY || '').trim().replace(/^["']+|["']+$/g, '');
     const demo = !rawKey;
     let all = [];
-    let truncated = false;
+    const coverage = []; // 전체를 못 가져온 유형의 조회 현황
     const warnings = [];
 
     if (demo) {
@@ -191,10 +196,15 @@ export default async function handler(req, res) {
       if (key.includes('%')) { try { key = decodeURIComponent(key); } catch { /* 그대로 사용 */ } }
       const apiTitle = f.q ? f.q.split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length)[0] : '';
       const results = await Promise.allSettled(types.map((t) => fetchType(t, key, r, basis, apiTitle, deadline)));
-      for (const x of results) {
-        if (x.status === 'fulfilled') { all.push(...x.value.rows); truncated = truncated || x.value.truncated; }
-        else warnings.push(String(x.reason?.message || x.reason));
-      }
+      results.forEach((x, idx) => {
+        if (x.status === 'fulfilled') {
+          all.push(...x.value.rows);
+          if (x.value.partial) {
+            const t = types[idx];
+            coverage.push({ type: t, label: OPS[t].label, total: x.value.total, fetched: x.value.rows.length, from: x.value.from, to: x.value.to });
+          }
+        } else warnings.push(String(x.reason?.message || x.reason));
+      });
       if (warnings.length === types.length) throw new Error(warnings.join(' / '));
     }
 
@@ -212,7 +222,8 @@ export default async function handler(req, res) {
       clamped: r.clamped,
       total: filtered.length,
       counts,
-      truncated,
+      truncated: coverage.length > 0,
+      coverage,
       warnings,
       items: filtered.slice(0, limit),
     });

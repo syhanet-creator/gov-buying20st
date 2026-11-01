@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b3d6e">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="입찰공고">
 <title>나라장터 입찰공고 검색</title>
 <style>
 :root{--bg:#f4f6f9;--card:#fff;--tx:#1b2430;--sub:#6b7686;--pri:#0b3d6e;--acc:#e8590c;--line:#e3e8ef;--in:#fff}
@@ -15,6 +21,7 @@ header h1{margin:0;font-size:18px}
 .meta{font-size:12px;opacity:.9;margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .dot{width:8px;height:8px;border-radius:50%;background:#4ade80;display:inline-block}
 .dot.err{background:#f87171}
+.meta button{margin-left:auto;padding:3px 10px;border-radius:99px;border:1px solid #ffffff80;background:#ffffff26;color:#fff;font-size:12px;cursor:pointer}
 main{padding:12px;max-width:860px;margin:0 auto}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
 .panel>summary{cursor:pointer;padding:12px 14px;font-weight:700;list-style:none;display:flex;flex-direction:column;gap:2px}
@@ -58,7 +65,7 @@ a.card:active{opacity:.7}
 <body>
 <header>
   <h1>🏗️ 나라장터 입찰공고 검색</h1>
-  <div class="meta"><span class="dot" id="dot"></span><span id="status">불러오는 중…</span></div>
+  <div class="meta"><span class="dot" id="dot"></span><span id="status">불러오는 중…</span><button id="install" type="button" hidden>📲 앱 설치</button></div>
 </header>
 <main>
   <details class="panel" id="panel" open>
@@ -124,7 +131,7 @@ a.card:active{opacity:.7}
   <button id="more" type="button" hidden>더 보기</button>
 </main>
 <script>
-const REFRESH_MS = 180_000, PAGE = 20, KEY = 'bidFilters.v2';
+const REFRESH_MS = 180_000, PAGE = 20, KEY = 'bidFilters.v2', CK = 'bidLast.v1';
 const TYPES = { cnstwk: '공사', servc: '용역', thng: '물품' };
 const REGIONS = ['서울','부산','대구','인천','광주','대전','울산','세종','경기','강원','충북','충남','전북','전남','경북','경남','제주'];
 const $ = (s) => document.querySelector(s);
@@ -228,7 +235,12 @@ function render() {
   const notes = [];
   if (j.demo) notes.push('<div class="banner">⚠️ 샘플 데이터입니다. Vercel 환경변수 <b>DATA_GO_KR_KEY</b>에 공공데이터포털 인증키를 등록하면 실제 공고가 표시됩니다.</div>');
   if (j.clamped) notes.push(`<div class="banner">조회 기간은 최대 31일입니다. ${j.range.from} ~ ${j.range.to} 로 조정했습니다.</div>`);
-  if (j.truncated) notes.push('<div class="banner">공고가 많아 일부만 조회됐을 수 있습니다. 기간을 줄이거나 키워드를 넣어 주세요.</div>');
+  if (j.coverage?.length) {
+    const t = (s) => (s ? s.slice(5, 16).replace('-', '/') : '?');
+    notes.push('<div class="banner"><b>일부만 조회됐습니다.</b> 공고가 많아 아래 유형은 전체를 가져오지 못했고, 지역·금액·키워드 조건은 가져온 공고 안에서만 적용됩니다.<br>' +
+      j.coverage.map((c) => `· ${esc(c.label)}: 전체 ${c.total.toLocaleString()}건 중 ${c.fetched.toLocaleString()}건 (게시 ${t(c.from)} ~ ${t(c.to)})`).join('<br>') +
+      '<br>기간을 줄이면(오늘~3일) 전부 조회됩니다.</div>');
+  }
   (j.warnings || []).forEach((w) => notes.push(`<div class="err-box">${esc(w)}</div>`));
   $('#note').innerHTML = notes.join('');
 
@@ -278,21 +290,45 @@ async function load() {
     }
     if (!res.ok || j.error) throw new Error(j.error || res.status);
     data = j;
+    try { localStorage.setItem(CK, JSON.stringify({ sig: sigOf(st), data: { ...j, items: j.items.slice(0, 60) } })); } catch {}
     $('#dot').className = 'dot';
     $('#status').textContent = '최종 갱신 ' + new Date(j.updatedAt).toLocaleTimeString('ko-KR');
     render();
   } catch (e) {
     $('#dot').className = 'dot err';
-    $('#status').textContent = '갱신 실패';
+    $('#status').textContent = data ? '갱신 실패 · 이전 목록 표시' : '갱신 실패';
     $('#note').innerHTML = `<div class="err-box">불러오지 못했습니다: ${esc(e.message)}</div>`;
   } finally {
     loading = false;
   }
 }
 
+// ── PWA: 설치 버튼 · 서비스워커 ─────────────────────
+let deferredInstall = null;
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; $('#install').hidden = false; });
+$('#install').addEventListener('click', async () => {
+  if (!deferredInstall) return;
+  deferredInstall.prompt();
+  try { await deferredInstall.userChoice; } catch {}
+  deferredInstall = null; $('#install').hidden = true;
+});
+addEventListener('appinstalled', () => { $('#install').hidden = true; });
+if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+
+// 마지막으로 본 목록을 저장해 두었다가 앱을 열면 바로 보여줌 (같은 검색 조건일 때만)
+function sigOf(s) { return JSON.stringify([s.types, s.preset, s.from, s.to, s.basis, s.region, s.org, s.q, s.min, s.max, s.sort]); }
+
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
 setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
 writeForm(st);
+try {
+  const c = JSON.parse(localStorage.getItem(CK) || 'null');
+  if (c && c.sig === sigOf(st) && c.data) {
+    data = { ...c.data, items: c.data.items.slice(0, PAGE) };
+    render();
+    $('#status').textContent = '저장된 목록 · 갱신 중…';
+  }
+} catch {}
 load();
 </script>
 </body>
