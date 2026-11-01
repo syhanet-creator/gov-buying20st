@@ -267,6 +267,31 @@ function render() {
   $('#more').hidden = j.items.length >= j.total;
 }
 
+// Supabase 공개(publishable) 키: 읽기 전용 RPC만 호출 가능 (테이블은 RLS로 직접 접근 차단)
+const SB_URL = 'https://vtqjxdtphmsfrsiynunl.supabase.co';
+const SB_KEY = 'sb_publishable_sSDvrjSsVa9miLYcbpEjaQ_8VzQZYvn';
+async function fromDb(r) {
+  const body = {
+    p_types: st.types, p_from: r.from, p_to: r.to, p_basis: st.basis, p_sort: st.sort, p_limit: limit,
+    p_region: st.region || null, p_org: st.org || null, p_q: st.q || null,
+    p_min: st.min !== '' ? Math.round(Number(st.min) * 1e4) : null,
+    p_max: st.max !== '' ? Math.round(Number(st.max) * 1e4) : null,
+  };
+  const res = await fetch(`${SB_URL}/rest/v1/rpc/g2b_search_bids`, {
+    method: 'POST', cache: 'no-store',
+    headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error('db ' + res.status);
+  const j = await res.json();
+  if (!j.has_data || !j.last_synced) return null;
+  // 수집본이 3시간 넘게 갱신되지 않았거나, 기간 시작이 수집 시작일보다 앞서면 실시간 API 사용
+  if (Date.now() - Date.parse(j.last_synced) > 3 * 3600000) return null;
+  if (j.db_min && r.from < j.db_min.slice(0, 10)) return null;
+  return { ...j, updatedAt: j.last_synced, source: 'db' };
+}
+
 async function load() {
   if (loading) return;
   loading = true;
@@ -280,15 +305,18 @@ async function load() {
     if (st.q) p.set('q', st.q);
     if (st.min !== '') p.set('min', Math.round(Number(st.min) * 1e4));
     if (st.max !== '') p.set('max', Math.round(Number(st.max) * 1e4));
-    const res = await fetch('/api/bids?' + p, { cache: 'no-store' });
-    const raw = await res.text();
-    let j;
-    try { j = JSON.parse(raw); } catch {
-      throw new Error(res.status === 504 || /TIMEOUT/i.test(raw)
-        ? '서버 응답 시간이 초과되었습니다. 기간을 줄이거나 조건을 추가해 다시 검색해 주세요.'
-        : `서버 오류 (${res.status})`);
+    // 1순위: Supabase DB(수집본). DB가 비었거나 조회 기간이 수집 시작일보다 앞서면 실시간 API로 대체
+    let j = await fromDb(r).catch(() => null);
+    if (!j) {
+      const res = await fetch('/api/bids?' + p, { cache: 'no-store' });
+      const raw = await res.text();
+      try { j = JSON.parse(raw); } catch {
+        throw new Error(res.status === 504 || /TIMEOUT/i.test(raw)
+          ? '서버 응답 시간이 초과되었습니다. 기간을 줄이거나 조건을 추가해 다시 검색해 주세요.'
+          : `서버 오류 (${res.status})`);
+      }
+      if (!res.ok || j.error) throw new Error(j.error || res.status);
     }
-    if (!res.ok || j.error) throw new Error(j.error || res.status);
     data = j;
     try { localStorage.setItem(CK, JSON.stringify({ sig: sigOf(st), data: { ...j, items: j.items.slice(0, 60) } })); } catch {}
     $('#dot').className = 'dot';
