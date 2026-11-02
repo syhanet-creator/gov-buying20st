@@ -91,9 +91,12 @@ a.card:active{opacity:.7}
         <div class="two"><input type="date" id="from"><span>~</span><input type="date" id="to"></div>
         <div class="two"><select id="basis"><option value="1">공고게시일 기준</option><option value="2">개찰일시 기준</option></select></div>
       </div>
-      <div class="row2">
-        <div><label class="lb" for="region">지역</label><select id="region"></select></div>
-        <div><label class="lb" for="org">기관·지역 키워드</label><input id="org" type="text" placeholder="예: 울주군, 한국수력원자력"></div>
+      <div>
+        <span class="lb">지역 <small style="font-weight:400">(여러 곳 선택 가능 · 선택 없으면 전국)</small></span>
+        <div class="chips" id="regions"></div>
+      </div>
+      <div>
+        <label class="lb" for="org">기관·지역 키워드</label><input id="org" type="text" placeholder="예: 울주군, 한국수력원자력">
       </div>
       <div>
         <label class="lb" for="q">품목·키워드 (공고명에 포함)</label>
@@ -148,7 +151,11 @@ const rangeOf = (s) => s.preset > 0
   : { from: s.from || kstDate(2), to: s.to || kstDate() };
 
 // ── 폼 ─────────────────────────────────────────
-$('#region').innerHTML = '<option value="">전체 지역</option>' + REGIONS.map((r) => `<option>${r}</option>`).join('');
+$('#regions').innerHTML = REGIONS.map((r) => `<label class="chip"><input type="checkbox" value="${r}"><span>${r}</span></label>`).join('') +
+  '<button type="button" id="regClear">지역 해제</button>';
+$('#regClear').addEventListener('click', () => document.querySelectorAll('#regions input').forEach((c) => { c.checked = false; }));
+// 예전 저장값(문자열 하나)도 쉼표 문자열로 통일해서 사용
+const regList = (s) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean);
 
 function markPreset() {
   document.querySelectorAll('#presets button').forEach((b) => b.classList.toggle('on', Number(b.dataset.d) === formPreset));
@@ -158,7 +165,8 @@ function writeForm(s) {
   formPreset = s.preset;
   const r = rangeOf(s);
   $('#from').value = r.from; $('#to').value = r.to;
-  $('#basis').value = s.basis; $('#region').value = s.region; $('#org').value = s.org; $('#q').value = s.q;
+  $('#basis').value = s.basis; document.querySelectorAll('#regions input').forEach((c) => { c.checked = regList(s.region).includes(c.value); });
+  $('#org').value = s.org; $('#q').value = s.q;
   $('#min').value = s.min; $('#max').value = s.max; $('#amt').value = ''; $('#sort').value = s.sort;
   markPreset();
 }
@@ -167,7 +175,7 @@ function readForm() {
   if (!types.length) types = Object.keys(TYPES);
   return {
     types, preset: formPreset, from: $('#from').value, to: $('#to').value, basis: $('#basis').value,
-    region: $('#region').value, org: $('#org').value.trim(), q: $('#q').value.trim(),
+    region: [...document.querySelectorAll('#regions input:checked')].map((c) => c.value).join(','), org: $('#org').value.trim(), q: $('#q').value.trim(),
     min: $('#min').value.trim(), max: $('#max').value.trim(), sort: $('#sort').value,
   };
 }
@@ -177,7 +185,7 @@ function describe(s) {
   const p = [s.types.length === 3 ? '공사·용역·물품' : s.types.map((t) => TYPES[t]).join('·')];
   p.push(s.preset > 0 ? (s.preset === 1 ? '오늘' : `최근 ${s.preset}일`) : `${r.from.slice(5)}~${r.to.slice(5)}`);
   if (s.basis === '2') p.push('개찰일 기준');
-  if (s.region) p.push(s.region);
+  if (s.region) p.push(regList(s.region).join('·'));
   if (s.org) p.push(s.org);
   if (s.q) p.push(`“${s.q}”`);
   if (s.min !== '' || s.max !== '') p.push(`${s.min !== '' ? money(Number(s.min)) : ''}~${s.max !== '' ? money(Number(s.max)) : ''}`);

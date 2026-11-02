@@ -133,7 +133,9 @@ async function fetchType(type, serviceKey, r, basis, title, deadline) {
 function matches(i, f) {
   if (f.region) {
     const hay = `${i.region} ${i.demand} ${i.org} ${i.title}`;
-    if (!(REGIONS[f.region] || [f.region]).some((a) => hay.includes(a))) return false;
+    const names = String(f.region).split(',').map((s) => s.trim()).filter(Boolean);
+    const aliases = names.flatMap((n) => REGIONS[n] || [n]);
+    if (aliases.length && !aliases.some((a) => hay.includes(a))) return false;
   }
   if (f.org && !`${i.region} ${i.demand} ${i.org}`.toLowerCase().includes(f.org.toLowerCase())) return false;
   if (f.q) {
